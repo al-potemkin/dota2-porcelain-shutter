@@ -6,7 +6,7 @@ public enum MatchStatus {
      */
     ACTIVE,
     /**
-     * 3 minutes elapsed — buttons removed, percentage results shown.
+     * 1 minute elapsed — buttons removed, percentage results shown.
      */
     VOTING_CLOSED,
     /**

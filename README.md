@@ -27,7 +27,7 @@ Pre-match voting, result summaries, Predictor MMR rating system, and a throne fo
 
 ### ⏳ Voting Closed
 
-> After 1 minutes, the buttons disappear and vote percentages are shown along with a meme comment. If someone voted
+> After 1 minute, the buttons disappear and vote percentages are shown along with a meme comment. If someone voted
 > against their own team, the bot calls it out.
 
 ![Voting Closed](src/main/resources/docs/images/vote_closed.png)
@@ -56,7 +56,7 @@ Pre-match voting, result summaries, Predictor MMR rating system, and a throne fo
 
 - The bot receives team rosters via REST API and publishes a vote in the group chat
 - Buttons: **🌝 Radiant 🌝** / **🌚 Dire 🌚** — a registered player's own team is highlighted with `🦔` emoji
-- Voting closes automatically after 1 minutes — percentages and a meme comment are posted
+- Voting closes automatically after 1 minute — percentages and a meme comment are posted
 - If a registered player voted against their own team — `💸 322 detected in chat...` appears in the message
 - After the match ends, the bot posts a detailed summary with per-player breakdowns
 

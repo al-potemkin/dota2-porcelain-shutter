@@ -350,7 +350,7 @@ public class MatchVotingBot implements LongPollingSingleThreadUpdateConsumer {
     }
 
     // -----------------------------------------------------------------------
-    // Scheduler — Step 2: Close in 3 minutes
+    // Scheduler — Step 2: Close in 1 minute
     // -----------------------------------------------------------------------
 
     @Scheduled(fixedDelay = 15_000)
