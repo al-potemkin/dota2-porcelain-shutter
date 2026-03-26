@@ -2,6 +2,8 @@ package com.porcelain_shutter.bot.controller;
 
 import com.porcelain_shutter.bot.dto.MatchEndRequest;
 import com.porcelain_shutter.bot.dto.MatchStartRequest;
+import com.porcelain_shutter.bot.dto.Team;
+import com.porcelain_shutter.bot.dto.VoteResponse;
 import com.porcelain_shutter.bot.handler.BotMessages;
 import com.porcelain_shutter.bot.handler.MatchVotingBot;
 import com.porcelain_shutter.bot.service.BannerProcessingService;
@@ -17,7 +19,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
  * REST API for controlling the voting lifecycle.
@@ -32,6 +33,7 @@ import java.util.Map;
 @RequestMapping("/api/vote")
 @RequiredArgsConstructor
 public class VoteController {
+    private static final String UNKNOWN = "unknown";
 
     private final BannerProcessingService bannerProcessingService;
     private final RegisteredChatService registeredChatService;
@@ -61,7 +63,7 @@ public class VoteController {
      * </pre>
      */
     @PostMapping("/start")
-    public ResponseEntity<Map<String, Object>> startVote(@RequestBody @Valid MatchStartRequest matchStart) {
+    public ResponseEntity<VoteResponse> startVote(@RequestBody @Valid MatchStartRequest matchStart) {
         log.info("[VoteController] POST /api/vote/start matchId={}", matchStart.getMatchId());
 
         List<Long> chatIds = registeredChatService.getActiveChatIds();
@@ -69,7 +71,26 @@ public class VoteController {
             log.warn("[VoteController] No active chats registered — bot not added to any group");
             return ResponseEntity
                     .status(409)
-                    .body(Map.of("error", "Bot is not added to any group chat"));
+                    .body(VoteResponse.builder()
+                            .status(VoteResponse.VoteStatus.NO_RECIPIENTS)
+                            .error("Bot is not added to any group chat")
+                            .build());
+        }
+
+        long numberOfInvalidNames = matchStart.getTeams().stream()
+                .flatMap(team -> team.getPlayers().stream())
+                .map(Team.Player::getCharacter)
+                .filter(character -> character == null || UNKNOWN.equalsIgnoreCase(character))
+                .count();
+
+        if (numberOfInvalidNames != 0) {
+            return ResponseEntity
+                    .status(400)
+                    .body(VoteResponse.builder()
+                            .status(VoteResponse.VoteStatus.WILL_NOT_BE_STARTED)
+                            .matchId(matchStart.getMatchId())
+                            .error("Unable to recognize names of characters participating in match")
+                            .build());
         }
 
         byte[] imageBytes = bannerProcessingService.getBannerImageBytes(matchStart.getTeams());
@@ -91,18 +112,22 @@ public class VoteController {
         if (started.isEmpty()) {
             return ResponseEntity
                     .status(409)
-                    .body(Map.of(
-                            "error", "A vote is already in progress in all chats",
-                            "skipped", skipped
-                    ));
+                    .body(VoteResponse.builder()
+                            .status(VoteResponse.VoteStatus.ALREADY_LAUNCHED)
+                            .error("A vote is already in progress in all chats")
+                            .matchId(matchStart.getMatchId())
+                            .skippedChatIds(skipped)
+                            .build());
         }
 
-        return ResponseEntity.ok(Map.of(
-                "status", "started",
-                "matchId", matchStart.getMatchId(),
-                "started", started,
-                "skipped", skipped
-        ));
+        return ResponseEntity.ok(
+                VoteResponse.builder()
+                        .status(VoteResponse.VoteStatus.STARTED)
+                        .matchId(matchStart.getMatchId())
+                        .startedChatIds(started)
+                        .skippedChatIds(skipped)
+                        .build()
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -122,7 +147,7 @@ public class VoteController {
      * </pre>
      */
     @PostMapping("/summarize")
-    public ResponseEntity<Map<String, Object>> summarizeVote(@RequestBody @Valid MatchEndRequest matchEnd) {
+    public ResponseEntity<VoteResponse> summarizeVote(@RequestBody @Valid MatchEndRequest matchEnd) {
         log.info("[VoteController] POST /api/vote/summarize matchId={} teamWon={}", matchEnd.getMatchId(), matchEnd.getTeamWon());
 
         boolean summarized = matchVotingBot.summarizeVote(matchEnd.getMatchId(), matchEnd.getTeamWon());
@@ -130,16 +155,18 @@ public class VoteController {
             log.warn("[VoteController] Could not summarize — session not found or already summarized. matchId={}", matchEnd.getMatchId());
             return ResponseEntity
                     .status(404)
-                    .body(Map.of(
-                            "error", "No eligible session found for matchId: " + matchEnd.getMatchId(),
-                            "hint", "Session may not exist, or has already been summarized"
-                    ));
+                    .body(VoteResponse.builder()
+                            .status(VoteResponse.VoteStatus.NOT_EXIST)
+                            .error("No eligible session found for matchId: " + matchEnd.getMatchId())
+                            .build());
         }
         log.info("[VoteController] Summary posted. matchId={} teamWon={}", matchEnd.getMatchId(), matchEnd.getTeamWon());
-        return ResponseEntity.ok(Map.of(
-                "status", "summarized",
-                "matchId", matchEnd.getMatchId(),
-                "teamWon", matchEnd.getTeamWon()
-        ));
+        return ResponseEntity.ok(
+                VoteResponse.builder()
+                        .status(VoteResponse.VoteStatus.SUMMARIZED)
+                        .matchId(matchEnd.getMatchId())
+                        .teamWon(matchEnd.getTeamWon())
+                        .build()
+        );
     }
 }
