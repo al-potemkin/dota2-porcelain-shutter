@@ -1,15 +1,19 @@
 package com.porcelain_shutter.bot.dto;
 
-public record VoteResult(long wins, long loses) {
+public record VoteResult(long radiant, long dire) {
     public long totalVotes() {
-        return wins + loses;
+        return radiant + dire;
     }
 
-    public long winPercent() {
-        return totalVotes() == 0 ? 0 : Math.round(100.0 * wins / totalVotes());
+    public long radiantPercent() {
+        return percent(radiant);
     }
 
-    public long losePercent() {
-        return totalVotes() == 0 ? 0 : Math.round(100.0 * loses / totalVotes());
+    public long direPercent() {
+        return percent(dire);
+    }
+
+    private long percent(long value) {
+        return totalVotes() == 0 ? 0 : Math.round(100.0 * value / totalVotes());
     }
 }

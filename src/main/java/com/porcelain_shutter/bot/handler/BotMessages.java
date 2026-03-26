@@ -79,13 +79,12 @@ public class BotMessages {
         String direName = sideLabel(VoteType.DIRE.getSideName(), playerSides, false);
         String radiantName = sideLabel(VoteType.RADIANT.getSideName(), playerSides, false);
 
+        sb.append(localeService.fmt("bot.match.summary.dire.line", localeService.get("bot.red.apple.emoji"), direName, results.dire(), results.direPercent())).append(NL);
         if (has322) {
-            sb.append(localeService.fmt("bot.voting.closed.dire_line", direName, results.loses(), results.losePercent())).append(NL);
-            sb.append(localeService.fmt("bot.voting.closed.radiant_line_mid", radiantName, results.wins(), results.winPercent())).append(NL);
+            sb.append(localeService.fmt("bot.match.summary.dire.line", localeService.get("bot.green.apple.emoji"), radiantName, results.radiant(), results.radiantPercent())).append(NL);
             sb.append(localeService.get("bot.voting.closed.has322")).append(NL);
         } else {
-            sb.append(localeService.fmt("bot.voting.closed.dire_line", direName, results.loses(), results.losePercent())).append(NL);
-            sb.append(localeService.fmt("bot.voting.closed.radiant_line_last", radiantName, results.wins(), results.winPercent())).append(NL);
+            sb.append(localeService.fmt("bot.match.summary.radiant.line", localeService.get("bot.green.apple.emoji"), radiantName, results.radiant(), results.radiantPercent())).append(NL);
         }
 
         if (memeComment != null && !memeComment.isBlank()) {
@@ -100,42 +99,41 @@ public class BotMessages {
 
     public String matchSummary(VoteResult results, String teamWon, String matchId, ThroneGame throne, Set<String> playerSides, boolean mmrEnabled) {
         boolean radiantWon = VoteType.RADIANT.equalsToSideName(teamWon);
-        String wonName = sideLabel(teamWon, playerSides, true);
-
-        String winEmoji = localeService.get(radiantWon ? "bot.green.apple.emoji" : "bot.red.apple.emoji");
-        String loseEmoji = localeService.get(radiantWon ? "bot.red.apple.emoji" : "bot.green.apple.emoji");
-
-        String winSide = (radiantWon ? VoteType.RADIANT : VoteType.DIRE).getSideName();
-        String loseSide = (radiantWon ? VoteType.DIRE : VoteType.RADIANT).getSideName();
+        String wonTeamName = sideLabel(teamWon, playerSides, true);
+        String wonEmoji = localeService.get(radiantWon ? "bot.green.apple.emoji" : "bot.red.apple.emoji");
 
         String matchLink = String.format(MATCH_LINK, esc(matchId), localeService.pick("pool.match.headers.good"));
 
+        String direLabel = sideLabel(VoteType.DIRE.getSideName(), playerSides, false);
+        String radiantLabel = sideLabel(VoteType.RADIANT.getSideName(), playerSides, false);
+
+        String direMmrTag = mmrEnabled ? (radiantWon ? localeService.get("bot.match.summary.lose.points") : localeService.get("bot.match.summary.win.points")) : Strings.EMPTY;
+        String radiantMmrTag = mmrEnabled ? (radiantWon ? localeService.get("bot.match.summary.win.points") : localeService.get("bot.match.summary.lose.points")) : Strings.EMPTY;
+
+        List<VoterStat> direVoters = radiantWon ? throne.loseVoters() : throne.winVoters();
+        List<VoterStat> radiantVoters = radiantWon ? throne.winVoters() : throne.loseVoters();
+
         StringBuilder sb = new StringBuilder();
-        sb.append(localeService.fmt("bot.match.summary.header", matchLink, winEmoji, wonName)).append(DOUBLE_NL);
+        sb.append(localeService.fmt("bot.match.summary.header", matchLink, wonEmoji, wonTeamName)).append(DOUBLE_NL);
         sb.append(localeService.get("bot.voting.results_header")).append(NL);
 
-        String winLabel = sideLabel(winSide, playerSides, false);
-        String loseLabel = sideLabel(loseSide, playerSides, false);
-
-        sb.append(localeService.fmt("bot.match.summary.win.line", winEmoji, winLabel, results.wins(), results.winPercent()));
-        if (!throne.winVoters().isEmpty()) {
-            if (mmrEnabled) {
-                sb.append(localeService.get("bot.match.summary.win.points"));
-            }
-            sb.append(localeService.fmt("bot.match.summary.win.bonus", formatVoterList(throne.winVoters(), mmrEnabled)));
+        // Dire
+        sb.append(localeService.fmt("bot.match.summary.dire.line", localeService.get("bot.red.apple.emoji"), direLabel, results.dire(), results.direPercent()))
+                .append(direMmrTag);
+        if (!direVoters.isEmpty()) {
+            sb.append(localeService.fmt("bot.match.summary.bonus", formatVoterList(direVoters, mmrEnabled)));
         }
         sb.append(NL);
 
-        sb.append(localeService.fmt("bot.match.summary.lose.line", loseEmoji, loseLabel, results.loses(), results.losePercent()));
-        if (!throne.loseVoters().isEmpty()) {
-            if (mmrEnabled) {
-                sb.append(localeService.get("bot.match.summary.lose.points"));
-            }
-            sb.append(localeService.fmt("bot.match.summary.lose.bonus", formatVoterList(throne.loseVoters(), mmrEnabled)));
+        // Radiant
+        sb.append(localeService.fmt("bot.match.summary.radiant.line", localeService.get("bot.green.apple.emoji"), radiantLabel, results.radiant(), results.radiantPercent()))
+                .append(radiantMmrTag);
+        if (!radiantVoters.isEmpty()) {
+            sb.append(localeService.fmt("bot.match.summary.bonus", formatVoterList(radiantVoters, mmrEnabled)));
         }
         sb.append(DOUBLE_NL);
 
-        boolean majorityCorrect = (results.wins() >= results.loses() && radiantWon) || (results.loses() > results.wins() && !radiantWon);
+        boolean majorityCorrect = (results.radiant() >= results.dire() && radiantWon) || (results.dire() > results.radiant() && !radiantWon);
 
         if (throne.has322()) {
             sb.append(localeService.pick(throne.betrayalCorrect() ? "pool.crowd.322.correct" : "pool.crowd.322.wrong")).append(DOUBLE_NL);

@@ -46,7 +46,7 @@ public class KeyboardFactory {
                 .build();
 
         return InlineKeyboardMarkup.builder()
-                .keyboardRow(new InlineKeyboardRow(List.of(direButton, radiantButton)))
+                .keyboardRow(new InlineKeyboardRow(List.of(radiantButton, direButton)))
                 .build();
     }
 }

@@ -251,8 +251,6 @@ public class MatchVotingBot implements LongPollingSingleThreadUpdateConsumer {
             return false;
         }
 
-        boolean anySuccess = false;
-
         for (PollSession session : sessions) {
             Long chatId = session.getChatId();
             if (session.getMatchStatus() == MatchStatus.SUMMARIZED) {
@@ -292,7 +290,7 @@ public class MatchVotingBot implements LongPollingSingleThreadUpdateConsumer {
                         session.getId(), chatId, e.getMessage(), e);
             }
         }
-        return anySuccess;
+        return false;
     }
 
     // -----------------------------------------------------------------------
@@ -378,8 +376,8 @@ public class MatchVotingBot implements LongPollingSingleThreadUpdateConsumer {
         boolean has322 = statisticService.hasBetrayal(matchId, chatId, session.getTeamsJson());
         Set<String> playerSides = statisticService.findPlayerSides(chatId, session.getTeamsJson());
 
-        log.info("[Scheduler] closeVotingWindow sessionId={} matchId={} chatId={} hasPhoto={} wins={} loses={} has322={}",
-                session.getId(), matchId, chatId, session.isHasPhoto(), results.wins(), results.loses(), has322);
+        log.info("[Scheduler] closeVotingWindow sessionId={} matchId={} chatId={} hasPhoto={} radiant={} dire={} has322={}",
+                session.getId(), matchId, chatId, session.isHasPhoto(), results.radiant(), results.dire(), has322);
 
         try {
             telegramClient.execute(EditMessageReplyMarkup.builder() // Remove buttons

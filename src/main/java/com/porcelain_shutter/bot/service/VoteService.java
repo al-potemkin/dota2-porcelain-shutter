@@ -59,8 +59,8 @@ public class VoteService {
 
     @Transactional(readOnly = true)
     public VoteResult getResultsByMatchId(String matchId, Long chatId) {
-        long wins = voteRepository.countByMatchIdAndChatIdAndVoteType(matchId, chatId, VoteType.RADIANT);
-        long loses = voteRepository.countByMatchIdAndChatIdAndVoteType(matchId, chatId, VoteType.DIRE);
-        return new VoteResult(wins, loses);
+        long radiant = voteRepository.countByMatchIdAndChatIdAndVoteType(matchId, chatId, VoteType.RADIANT);
+        long dire = voteRepository.countByMatchIdAndChatIdAndVoteType(matchId, chatId, VoteType.DIRE);
+        return new VoteResult(radiant, dire);
     }
 }
