@@ -4,9 +4,11 @@ import com.porcelain_shutter.bot.dto.MatchEndRequest;
 import com.porcelain_shutter.bot.dto.MatchStartRequest;
 import com.porcelain_shutter.bot.dto.Team;
 import com.porcelain_shutter.bot.dto.VoteResponse;
+import com.porcelain_shutter.bot.entity.PollSession;
 import com.porcelain_shutter.bot.handler.BotMessages;
 import com.porcelain_shutter.bot.handler.MatchVotingBot;
 import com.porcelain_shutter.bot.service.BannerProcessingService;
+import com.porcelain_shutter.bot.service.PollService;
 import com.porcelain_shutter.bot.service.RegisteredChatService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +40,7 @@ public class VoteController {
     private final BannerProcessingService bannerProcessingService;
     private final RegisteredChatService registeredChatService;
     private final MatchVotingBot matchVotingBot;
+    private final PollService pollService;
     private final BotMessages botMessages;
 
     // -----------------------------------------------------------------------
@@ -84,6 +87,7 @@ public class VoteController {
                 .count();
 
         if (numberOfInvalidNames != 0) {
+            log.warn("[VoteController] No information about the characters in {} game. Unable to start voting.", matchStart.getMatchId());
             return ResponseEntity
                     .status(400)
                     .body(VoteResponse.builder()
@@ -99,17 +103,17 @@ public class VoteController {
                 matchStart.getPredictionComment(), matchStart.getMemeComment());
         log.debug("[VoteController] Vote message built:\n{}", voteText);
 
-        List<Long> started = new ArrayList<>();
+        List<Long> processed = new ArrayList<>();
         List<Long> skipped = new ArrayList<>();
         chatIds.forEach(
                 chatId -> {
                     boolean ok = matchVotingBot.startVote(chatId, voteText, matchStart.getMatchId(), imageBytes, matchStart.getTeams(), matchStart.getMemeComment());
-                    (ok ? started : skipped).add(chatId);
+                    (ok ? processed : skipped).add(chatId);
                 }
         );
         log.info("[VoteController] Vote started. matchId={} started={} skipped={}",
-                matchStart.getMatchId(), started, skipped);
-        if (started.isEmpty()) {
+                matchStart.getMatchId(), processed, skipped);
+        if (processed.isEmpty()) {
             return ResponseEntity
                     .status(409)
                     .body(VoteResponse.builder()
@@ -119,12 +123,11 @@ public class VoteController {
                             .skippedChatIds(skipped)
                             .build());
         }
-
         return ResponseEntity.ok(
                 VoteResponse.builder()
                         .status(VoteResponse.VoteStatus.STARTED)
                         .matchId(matchStart.getMatchId())
-                        .startedChatIds(started)
+                        .processedChatIds(processed)
                         .skippedChatIds(skipped)
                         .build()
         );
@@ -150,8 +153,8 @@ public class VoteController {
     public ResponseEntity<VoteResponse> summarizeVote(@RequestBody @Valid MatchEndRequest matchEnd) {
         log.info("[VoteController] POST /api/vote/summarize matchId={} teamWon={}", matchEnd.getMatchId(), matchEnd.getTeamWon());
 
-        boolean summarized = matchVotingBot.summarizeVote(matchEnd.getMatchId(), matchEnd.getTeamWon());
-        if (!summarized) {
+        List<PollSession> sessions = pollService.findAllByMatchId(matchEnd.getMatchId());
+        if (sessions.isEmpty()) {
             log.warn("[VoteController] Could not summarize — session not found or already summarized. matchId={}", matchEnd.getMatchId());
             return ResponseEntity
                     .status(404)
@@ -160,12 +163,35 @@ public class VoteController {
                             .error("No eligible session found for matchId: " + matchEnd.getMatchId())
                             .build());
         }
-        log.info("[VoteController] Summary posted. matchId={} teamWon={}", matchEnd.getMatchId(), matchEnd.getTeamWon());
+        log.info("[VoteController] {} sessions found for summary", sessions.size());
+
+        List<Long> processed = new ArrayList<>();
+        List<Long> skipped = new ArrayList<>();
+        sessions.forEach(
+                session -> {
+                    boolean ok = matchVotingBot.summarizeVote(session, matchEnd.getMatchId(), matchEnd.getTeamWon());
+                    (ok ? processed : skipped).add(session.getChatId());
+                }
+        );
+        log.info("[VoteController] Summary posted. matchId={} teamWon={}",
+                matchEnd.getMatchId(), matchEnd.getTeamWon());
+        if (processed.isEmpty()) {
+            return ResponseEntity
+                    .status(409)
+                    .body(VoteResponse.builder()
+                            .status(VoteResponse.VoteStatus.ALREADY_SUMMARIZED)
+                            .error("Summary is already in posted in all chats")
+                            .matchId(matchEnd.getMatchId())
+                            .skippedChatIds(skipped)
+                            .build());
+        }
         return ResponseEntity.ok(
                 VoteResponse.builder()
                         .status(VoteResponse.VoteStatus.SUMMARIZED)
                         .matchId(matchEnd.getMatchId())
                         .teamWon(matchEnd.getTeamWon())
+                        .processedChatIds(processed)
+                        .skippedChatIds(skipped)
                         .build()
         );
     }

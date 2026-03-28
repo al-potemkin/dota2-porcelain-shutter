@@ -32,7 +32,7 @@ public class DotaProfileService {
                 .findByChatIdAndUserIdAndDotaNicknameIgnoreCase(chatId, userId, dotaNickname);
 
         if (existing.isPresent()) {
-            log.info("[DotaProfile] Already exists chatId={} userId={} nick='{}'", chatId, userId, dotaNickname);
+            log.info("[DotaProfile] Already exists chatId={} userId={} nickname='{}'", chatId, userId, dotaNickname);
             return RegisterResult.ALREADY_EXISTS;
         }
 
@@ -43,7 +43,7 @@ public class DotaProfileService {
                 .dotaNickname(dotaNickname)
                 .registeredAt(LocalDateTime.now())
                 .build());
-        log.info("[DotaProfile] Created chatId={} userId={} nick='{}'", chatId, userId, dotaNickname);
+        log.info("[DotaProfile] Created chatId={} userId={} nickname='{}'", chatId, userId, dotaNickname);
         return RegisterResult.CREATED;
     }
 
@@ -57,12 +57,12 @@ public class DotaProfileService {
                 .findByChatIdAndUserIdAndDotaNicknameIgnoreCase(chatId, userId, dotaNickname);
 
         if (existing.isEmpty()) {
-            log.info("[DotaProfile] Not found for delete chatId={} userId={} nick='{}'", chatId, userId, dotaNickname);
+            log.info("[DotaProfile] Not found for delete chatId={} userId={} nickname='{}'", chatId, userId, dotaNickname);
             return false;
         }
 
         repository.delete(existing.get());
-        log.info("[DotaProfile] Deleted chatId={} userId={} nick='{}'", chatId, userId, dotaNickname);
+        log.info("[DotaProfile] Deleted chatId={} userId={} nickname='{}'", chatId, userId, dotaNickname);
         return true;
     }
 

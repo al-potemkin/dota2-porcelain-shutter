@@ -242,53 +242,44 @@ public class MatchVotingBot implements LongPollingSingleThreadUpdateConsumer {
     /**
      * Step 3: Publishes the match result to all chats where this matchId was launched.
      */
-    public boolean summarizeVote(String matchId, String teamWon) {
-        log.info("[Bot] summarizeVote matchId={} teamWon={}", matchId, teamWon);
-
-        List<PollSession> sessions = pollService.findAllByMatchId(matchId);
-        if (sessions.isEmpty()) {
-            log.warn("[Bot] No sessions found for matchId={}", matchId);
+    public boolean summarizeVote(PollSession session, String matchId, String teamWon) {
+        Long chatId = session.getChatId();
+        log.info("[Bot] summarizeVote chatId={} matchId={} teamWon={}", chatId, matchId, teamWon);
+        if (session.getMatchStatus() == MatchStatus.SUMMARIZED) {
+            log.warn("[Bot] sessionId={} chatId={} already SUMMARIZED — skipping",
+                    session.getId(), chatId);
             return false;
         }
 
-        for (PollSession session : sessions) {
-            Long chatId = session.getChatId();
-            if (session.getMatchStatus() == MatchStatus.SUMMARIZED) {
-                log.warn("[Bot] sessionId={} chatId={} already SUMMARIZED — skipping",
-                        session.getId(), chatId);
-                continue;
+        if (session.getMatchStatus() == MatchStatus.ACTIVE) {
+            log.warn("[Bot] summarize on ACTIVE — force-closing sessionId={} chatId={}",
+                    session.getId(), chatId);
+            closeVotingWindow(session);
+        }
+
+        VoteResult results = voteService.getResultsByMatchId(matchId, chatId);
+        boolean mmrEnabled = results.totalVotes() >= PLAYER_NUMBER_THRESHOLD;
+        Set<String> playerSides = statisticService.findPlayerSides(chatId, session.getTeamsJson());
+        ThroneGame throne = statisticService.updateAfterMatch(matchId, chatId, teamWon, session.getTeamsJson());
+        String summaryText = botMessages.matchSummary(results, teamWon, matchId, throne, playerSides, mmrEnabled);
+
+        try {
+            if (session.isHasPhoto()) {
+                // Telegram doesn't allow removing a photo from a message via edit.
+                // Delete the photo message and send a new text message.
+                deleteMessage(chatId, session.getMessageId());
+                sendTextNoPreview(chatId, summaryText);
+            } else {
+                editMessageContentNoPreview(chatId, session.getMessageId(), summaryText);
             }
+            pollService.markSummarized(session);
 
-            if (session.getMatchStatus() == MatchStatus.ACTIVE) {
-                log.warn("[Bot] summarize on ACTIVE — force-closing sessionId={} chatId={}",
-                        session.getId(), chatId);
-                closeVotingWindow(session);
-            }
-
-            VoteResult results = voteService.getResultsByMatchId(matchId, chatId);
-            boolean mmrEnabled = results.totalVotes() >= PLAYER_NUMBER_THRESHOLD;
-            Set<String> playerSides = statisticService.findPlayerSides(chatId, session.getTeamsJson());
-            ThroneGame throne = statisticService.updateAfterMatch(matchId, chatId, teamWon, session.getTeamsJson());
-            String summaryText = botMessages.matchSummary(results, teamWon, matchId, throne, playerSides, mmrEnabled);
-
-            try {
-                if (session.isHasPhoto()) {
-                    // Telegram doesn't allow removing a photo from a message via edit.
-                    // Delete the photo message and send a new text message.
-                    deleteMessage(chatId, session.getMessageId());
-                    sendTextNoPreview(chatId, summaryText);
-                } else {
-                    editMessageContentNoPreview(chatId, session.getMessageId(), summaryText);
-                }
-                pollService.markSummarized(session);
-
-                log.info("[Bot] Summary posted sessionId={} chatId={} matchId={} teamWon={}",
-                        session.getId(), chatId, matchId, teamWon);
-                return true;
-            } catch (TelegramApiException e) {
-                log.error("[Bot] Failed to post summary sessionId={} chatId={}: {}",
-                        session.getId(), chatId, e.getMessage(), e);
-            }
+            log.info("[Bot] Summary posted sessionId={} chatId={} matchId={} teamWon={}",
+                    session.getId(), chatId, matchId, teamWon);
+            return true;
+        } catch (TelegramApiException e) {
+            log.error("[Bot] Failed to post summary sessionId={} chatId={}: {}",
+                    session.getId(), chatId, e.getMessage(), e);
         }
         return false;
     }
@@ -517,7 +508,7 @@ public class MatchVotingBot implements LongPollingSingleThreadUpdateConsumer {
 
         boolean isOwnTeam = (VoteType.RADIANT.equalsToSideName(playerTeam.get()) && voteType == VoteType.RADIANT)
                 || (VoteType.DIRE.equalsToSideName(playerTeam.get()) && voteType == VoteType.DIRE);
-        log.info("[Callback] Player nick='{}' team={} votedFor={} isOwnTeam={}",
+        log.info("[Callback] Player nickname='{}' team={} votedFor={} isOwnTeam={}",
                 matchedNickname.get(), playerTeam.get(), voteType, isOwnTeam);
         return isOwnTeam
                 ? botMessages.voteForOwnTeam()
