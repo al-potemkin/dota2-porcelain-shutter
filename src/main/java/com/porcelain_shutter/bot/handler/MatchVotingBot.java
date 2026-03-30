@@ -166,8 +166,9 @@ public class MatchVotingBot implements LongPollingSingleThreadUpdateConsumer {
                     ? botMessages.dotaAlreadyExists(arg)
                     : botMessages.dotaRegistered(arg);
             sendText(chatId, text);
+        } else {
+            sendText(chatId, botMessages.dotaMissingNickname());
         }
-        sendText(chatId, botMessages.dotaMissingNickname());
     }
 
     private void handleUnregister(Long chatId, Long userId, String arg) {
@@ -177,9 +178,10 @@ public class MatchVotingBot implements LongPollingSingleThreadUpdateConsumer {
             sendText(chatId, deleted
                     ? botMessages.dotaUnregistered(arg)
                     : botMessages.dotaNickNotFound(arg));
+        } else {
+            List<DotaProfile> nicknames = dotaProfileService.findAllByUser(chatId, userId);
+            sendText(chatId, botMessages.dotaUnregisterUsage(nicknames));
         }
-        List<DotaProfile> nicknames = dotaProfileService.findAllByUser(chatId, userId);
-        sendText(chatId, botMessages.dotaUnregisterUsage(nicknames));
     }
 
     private void handleProfile(Long chatId, Long userId, String telegramUsername) {
