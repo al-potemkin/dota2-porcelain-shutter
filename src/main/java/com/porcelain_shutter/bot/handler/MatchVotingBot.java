@@ -217,8 +217,8 @@ public class MatchVotingBot implements LongPollingSingleThreadUpdateConsumer {
                 boolean hasPhoto = imageBytes != null;
                 String teamsJson = objectMapperConverter.serializeTeams(teams);
 
-                Set<String> playerSides = statisticService.findPlayerSides(chatId, teamsJson);
-                String playerTeamSide = playerSides.size() == 1 ? playerSides.iterator().next() : null;
+                List<String> playerSides = statisticService.findPlayerSides(chatId, teamsJson);
+                String playerTeamSide = playerSides.size() == 1 ? playerSides.getFirst() : null;
 
                 log.info("[Bot] startVote chatId={} matchId={} playerSide={}", chatId, matchId, playerTeamSide);
 
@@ -261,7 +261,7 @@ public class MatchVotingBot implements LongPollingSingleThreadUpdateConsumer {
 
         VoteResult results = voteService.getResultsByMatchId(matchId, chatId);
         boolean mmrEnabled = results.totalVotes() >= PLAYER_NUMBER_THRESHOLD;
-        Set<String> playerSides = statisticService.findPlayerSides(chatId, session.getTeamsJson());
+        List<String> playerSides = statisticService.findPlayerSides(chatId, session.getTeamsJson());
         ThroneGame throne = statisticService.updateAfterMatch(matchId, chatId, teamWon, session.getTeamsJson());
         String summaryText = botMessages.matchSummary(results, teamWon, matchId, throne, playerSides, mmrEnabled);
 
@@ -329,8 +329,8 @@ public class MatchVotingBot implements LongPollingSingleThreadUpdateConsumer {
 
         PollSession session = sessionOpt.get();
         boolean accepted = voteService.castVote(chatId, userId, userName, voteType, session.getMatchId());
-        log.info("[Callback] Vote {} chatId={} userId={} matchId={} type={}",
-                accepted ? "ACCEPTED" : "REJECTED", chatId, userId, session.getMatchId(), voteType);
+        log.info("[Callback] Vote {} chatId={} userId={} userName={}, matchId={} type={}",
+                accepted ? "ACCEPTED" : "REJECTED", chatId, userId, session.getMatchId(), userName, voteType);
 
         if (!accepted) {
             answerCallback(callbackId, botMessages.voteAlreadyCast(), true);
@@ -367,7 +367,7 @@ public class MatchVotingBot implements LongPollingSingleThreadUpdateConsumer {
 
         VoteResult results = voteService.getResultsByMatchId(matchId, chatId);
         boolean has322 = statisticService.hasBetrayal(matchId, chatId, session.getTeamsJson());
-        Set<String> playerSides = statisticService.findPlayerSides(chatId, session.getTeamsJson());
+        List<String> playerSides = statisticService.findPlayerSides(chatId, session.getTeamsJson());
 
         log.info("[Scheduler] closeVotingWindow sessionId={} matchId={} chatId={} hasPhoto={} radiant={} dire={} has322={}",
                 session.getId(), matchId, chatId, session.isHasPhoto(), results.radiant(), results.dire(), has322);
@@ -498,7 +498,7 @@ public class MatchVotingBot implements LongPollingSingleThreadUpdateConsumer {
         }
 
         Set<String> matchNicknames = dotaProfileService.extractMatchNicknames(teams);
-        Optional<String> matchedNickname = dotaProfileService.findMatchingNick(userNicknames, matchNicknames);
+        Optional<String> matchedNickname = dotaProfileService.findMatchingNickname(userNicknames, matchNicknames);
         if (matchedNickname.isEmpty()) {
             return botMessages.voteAccepted(voteType);
         }

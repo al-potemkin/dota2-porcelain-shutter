@@ -14,7 +14,6 @@ import org.apache.logging.log4j.util.Strings;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
@@ -71,7 +70,7 @@ public class BotMessages {
         return sb.append(DOUBLE_NL).append(localeService.get("bot.poll.start.footer")).toString();
     }
 
-    public String votingClosed(VoteResult results, String memeComment, boolean has322, Set<String> playerSides) {
+    public String votingClosed(VoteResult results, String memeComment, boolean has322, List<String> playerSides) {
         StringBuilder sb = new StringBuilder();
         sb.append(localeService.get("bot.voting.closed.title")).append(DOUBLE_NL);
         sb.append(localeService.get("bot.voting.results_header")).append(NL);
@@ -97,9 +96,10 @@ public class BotMessages {
         )).toString();
     }
 
-    public String matchSummary(VoteResult results, String teamWon, String matchId, ThroneGame throne, Set<String> playerSides, boolean mmrEnabled) {
-        boolean radiantWon = VoteType.RADIANT.equalsToSideName(teamWon);
-        String wonTeamName = sideLabel(teamWon, playerSides, true);
+    public String matchSummary(VoteResult results, String teamWon, String matchId, ThroneGame throne, List<String> playerSides, boolean mmrEnabled) {
+        VoteType wonVote = VoteType.findBySideName(teamWon);
+        boolean radiantWon = VoteType.RADIANT == wonVote;
+        String wonTeamName = sideLabel(wonVote.getSideName(), playerSides, true);
         String wonEmoji = localeService.get(radiantWon ? "bot.green.apple.emoji" : "bot.red.apple.emoji");
 
         String matchLink = String.format(MATCH_LINK, esc(matchId), localeService.pick("pool.match.headers.good"));
@@ -182,7 +182,7 @@ public class BotMessages {
         };
     }
 
-    private String sideLabel(String side, Set<String> playerSides, boolean simple) {
+    private String sideLabel(String side, List<String> playerSides, boolean simple) {
         if (playerSides != null && playerSides.stream().anyMatch(playerSide -> playerSide.equalsIgnoreCase(side))) {
             return simple
                     ? esc(side)

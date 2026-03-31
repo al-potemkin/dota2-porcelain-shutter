@@ -82,7 +82,7 @@ public class DotaProfileService {
      * @param matchNicknames all nicknames of the match participants (from MatchStartRequest.players)
      * @return the first matching nickname or empty
      */
-    public Optional<String> findMatchingNick(List<String> userNicknames, Set<String> matchNicknames) {
+    public Optional<String> findMatchingNickname(List<String> userNicknames, Set<String> matchNicknames) {
         return userNicknames.stream()
                 .filter(nickname -> matchNicknames.stream().anyMatch(matchNickname -> matchNickname.equalsIgnoreCase(nickname)))
                 .findFirst();

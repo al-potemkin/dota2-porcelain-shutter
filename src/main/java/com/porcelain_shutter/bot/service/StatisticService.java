@@ -20,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -60,7 +59,7 @@ public class StatisticService {
         log.info("[StatisticService] updateAfterMatch matchId={} chatId={} teamWon={}", matchId, chatId, teamWon);
         List<Vote> votes = voteRepository.findAllByMatchIdAndChatId(matchId, chatId);
         List<Team> teams = objectMapperConverter.deserializeTeams(teamsJson);
-        Map<Long, List<String>> nicknames = loadChatNicksByUser(chatId);
+        Map<Long, List<String>> nicknames = loadChatNicknames(chatId);
 
         Map<Long, Long> mmrBefore = snapshotMMR(chatId);
         String oldKing = resolveKingName(mmrBefore, chatId);
@@ -79,7 +78,9 @@ public class StatisticService {
 
             if (isBetrayal) {
                 anyBetrayal = true;
-                if (correct) betrayalWasRight = true;
+                if (correct) {
+                    betrayalWasRight = true;
+                }
             }
         }
 
@@ -110,8 +111,7 @@ public class StatisticService {
         return new ThroneGame(
                 winVoters, loseVoters,
                 event, newKing, kingMmr,
-                battle, challengers,
-                oldKing,
+                battle, challengers, oldKing,
                 anyBetrayal, betrayalWasRight
         );
     }
@@ -138,9 +138,11 @@ public class StatisticService {
     public boolean hasBetrayal(String matchId, Long chatId, String teamsJson) {
         List<Vote> votes = voteRepository.findAllByMatchIdAndChatId(matchId, chatId);
         List<Team> teams = objectMapperConverter.deserializeTeams(teamsJson);
-        if (teams == null || teams.isEmpty()) return false;
-        Map<Long, List<String>> nicknames = loadChatNicksByUser(chatId);
-        return votes.stream().anyMatch(v -> detectBetrayal(v.getUserId(), v.getVoteType(), teams, nicknames));
+        if (teams == null || teams.isEmpty()) {
+            return false;
+        }
+        Map<Long, List<String>> nicknames = loadChatNicknames(chatId);
+        return votes.stream().anyMatch(vote -> detectBetrayal(vote.getUserId(), vote.getVoteType(), teams, nicknames));
     }
 
     /**
@@ -148,31 +150,31 @@ public class StatisticService {
      * Used to underline teams in messages.
      */
     @Transactional(readOnly = true)
-    public Set<String> findPlayerSides(Long chatId, String teamsJson) {
+    public List<String> findPlayerSides(Long chatId, String teamsJson) {
         List<Team> teams = objectMapperConverter.deserializeTeams(teamsJson);
-        if (teams == null || teams.isEmpty()) return Set.of();
+        if (teams == null || teams.isEmpty()) {
+            return Collections.emptyList();
+        }
 
-        Set<String> allNicks = loadChatNicksByUser(chatId).values().stream()
+        Set<String> allNicknames = loadChatNicknames(chatId).values().stream()
                 .flatMap(Collection::stream)
                 .map(String::toLowerCase)
                 .collect(Collectors.toSet());
 
-        Set<String> sides = new HashSet<>();
-        for (Team team : teams) {
-            if (team.getPlayers() == null) continue;
-            boolean hasPlayer = team.getPlayers().stream()
-                    .anyMatch(p -> allNicks.contains(p.getNickname().toLowerCase()));
-            if (hasPlayer) sides.add(team.getTeamSide());
-        }
-        return sides;
+        return teams.stream()
+                .filter(team -> team.getPlayers() != null)
+                .filter(team -> team.getPlayers().stream().anyMatch(player -> allNicknames.contains(player.getNickname().toLowerCase())))
+                .map(Team::getTeamSide)
+                .distinct()
+                .toList();
     }
 
     // -----------------------------------------------------------------------
     // Betrayal detection
     // -----------------------------------------------------------------------
 
-    boolean detectBetrayal(Long userId, VoteType usersVote, List<Team> teams,
-                           Map<Long, List<String>> profilesByUser) {
+    private boolean detectBetrayal(Long userId, VoteType usersVote, List<Team> teams,
+                                   Map<Long, List<String>> profilesByUser) {
         if (teams == null || teams.isEmpty() || !profilesByUser.containsKey(userId)) {
             return false;
         }
@@ -421,7 +423,7 @@ public class StatisticService {
                 .anyMatch(player -> userNicknames.stream().anyMatch(nickname -> nickname.equalsIgnoreCase(player.getNickname())));
     }
 
-    private Map<Long, List<String>> loadChatNicksByUser(Long chatId) {
+    private Map<Long, List<String>> loadChatNicknames(Long chatId) {
         return dotaProfileRepository.findAllByChatId(chatId).stream()
                 .collect(Collectors.groupingBy(
                         DotaProfile::getUserId,

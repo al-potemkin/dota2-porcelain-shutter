@@ -24,8 +24,8 @@ public class KeyboardFactory {
      * [Radiant] [Dire]
      */
     public InlineKeyboardMarkup votingKeyboard(String playerTeamSide) {
-        boolean isRadiant = VoteType.RADIANT.getSideName().equals(playerTeamSide);
-        boolean isDire = VoteType.DIRE.getSideName().equals(playerTeamSide);
+        boolean isRadiant = VoteType.RADIANT.equalsToSideName(playerTeamSide);
+        boolean isDire = VoteType.DIRE.equalsToSideName(playerTeamSide);
 
         InlineKeyboardButton radiantButton = InlineKeyboardButton.builder()
                 .text(localeService.get(isRadiant
